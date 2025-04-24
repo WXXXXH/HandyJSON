@@ -27,13 +27,38 @@ struct _class_rw_t {
     // other fields we don't care
 
     // reference: include/swift/Remote/MetadataReader.h/readObjcRODataPtr
+    
+/** old code  fix carsh from wanghui
+ 
+ func class_ro_t() -> UnsafePointer<_class_ro_t>? {
+ var addr: UInt = self.ro
+ if (self.ro & UInt(1)) != 0 {
+ if let ptr = UnsafePointer<UInt>(bitPattern: self.ro ^ 1) {
+ addr = ptr.pointee
+ }
+ }
+ return UnsafePointer<_class_ro_t>(bitPattern: addr)
+ }
+ */
+    
     func class_ro_t() -> UnsafePointer<_class_ro_t>? {
         var addr: UInt = self.ro
         if (self.ro & UInt(1)) != 0 {
-            if let ptr = UnsafePointer<UInt>(bitPattern: self.ro ^ 1) {
-                addr = ptr.pointee
+            let rawAddr = self.ro ^ 1
+            guard let ptr = UnsafePointer<UInt>(bitPattern: rawAddr) else {
+                print("⚠️ ro ^ 1 = \(String(format: "%p", rawAddr)) is invalid pointer")
+                return nil
             }
+
+            // 加地址合法性判断（防止野指针解引用）
+            let potentialAddr = ptr.pointee
+            if potentialAddr < 0x1000 {
+                print("⚠️ potential class_ro_t address too small or invalid: \(String(format: "%p", potentialAddr))")
+                return nil
+            }
+            addr = potentialAddr
         }
+
         return UnsafePointer<_class_ro_t>(bitPattern: addr)
     }
 }
